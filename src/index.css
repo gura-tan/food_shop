@@ -954,23 +954,21 @@ input { font-family: var(--font-body); }
   padding: var(--sp-md);
   max-width: 960px;
   margin: 0 auto;
-  display: flex;
-  justify-content: center;
 }
 
 .kitchen-display-card {
-  background: #ffffff;
-  color: #1a1a24;
+  background: var(--clr-surface);
+  border: 1.5px solid var(--clr-border);
   border-radius: var(--r-xl);
-  padding: var(--sp-2xl) var(--sp-xl);
+  padding: var(--sp-xl);
   width: 100%;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
   min-height: 70vh;
 }
 
 .empty-message--large {
-  font-size: 1.3rem;
-  color: #888e9e;
+  font-size: 1.2rem;
+  color: var(--clr-text-muted);
   padding: 4rem 1rem;
   text-align: center;
 }
@@ -978,78 +976,103 @@ input { font-family: var(--font-body); }
 .kitchen-grid-table {
   display: flex;
   flex-direction: column;
+  gap: var(--sp-sm);
   width: 100%;
 }
 
 .kitchen-grid-row {
   display: grid;
-  grid-template-columns: 160px 1fr 1fr;
+  grid-template-columns: 180px 1fr 1fr;
   align-items: center;
-  padding: 1.4rem 1rem;
-  border-bottom: 1px solid #f0f0f5;
-  transition: opacity 0.2s;
+  padding: 1.1rem 1.25rem;
+  background: var(--clr-surface-2);
+  border: 1.5px solid var(--clr-border);
+  border-radius: var(--r-lg);
+  transition: all 0.15s ease;
 }
 
+/* 通常表示（調理中）: 受取タブの通常カードと調和 */
+.kitchen-grid-row:not(.kitchen-grid-row--dim):not(.kitchen-grid-header):not(.kitchen-grid-total) {
+  border-color: rgba(79, 124, 255, 0.35);
+  background: rgba(79, 124, 255, 0.04);
+}
+
+/* グレー/薄表示（会計中）: 受取タブの dim 表示と調和 */
 .kitchen-grid-row--dim {
-  color: #9ca3af;
+  opacity: 0.55;
+  border-style: dashed;
+  border-color: var(--clr-border-2);
+  background: transparent;
 }
 
-.kitchen-billing-tag {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  background: #f3e8ff;
-  color: #7e22ce;
-  padding: 2px 8px;
-  border-radius: var(--r-full);
-  margin-left: 8px;
-  vertical-align: middle;
+.kitchen-grid-row--dim .kitchen-grid-cell--qty {
+  color: var(--clr-text-muted);
 }
 
+/* ヘッダー行 */
 .kitchen-grid-header {
-  border-bottom: 2px solid #e5e7eb;
-  padding-bottom: 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--clr-border-2);
+  border-radius: 0;
+  padding: 0.5rem 1.25rem 1.25rem;
 }
 
 .kitchen-grid-cell--menu {
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   font-weight: 800;
   text-align: center;
-  color: inherit;
+  color: var(--clr-text);
+  letter-spacing: 0.03em;
 }
 
 .kitchen-grid-body {
   display: flex;
   flex-direction: column;
+  gap: var(--sp-sm);
 }
 
 .kitchen-grid-cell--ticket {
-  font-size: 2rem;
-  font-weight: 800;
-  color: inherit;
   display: flex;
   align-items: center;
+  gap: var(--sp-sm);
+}
+
+.kitchen-grid-cell--ticket .order-ticket-badge {
+  padding: 6px 14px;
+}
+
+.kitchen-grid-cell--ticket .order-ticket-num {
+  font-size: 1.35rem;
 }
 
 .kitchen-grid-cell--qty {
-  font-size: 2.5rem;
+  font-size: 2.3rem;
   font-weight: 800;
   text-align: center;
-  color: inherit;
+  color: #ffffff;
 }
 
+/* 最下部合計行 */
 .kitchen-grid-total {
-  border-top: 3px solid #111827;
-  border-bottom: none;
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
+  background: rgba(79, 124, 255, 0.1);
+  border: 2px solid rgba(79, 124, 255, 0.4);
+  border-radius: var(--r-lg);
+  margin-top: var(--sp-md);
+  padding: 1.2rem 1.25rem;
 }
 
-.kitchen-grid-total .kitchen-grid-cell--ticket,
-.kitchen-grid-total .kitchen-grid-cell--qty {
-  font-size: 2.2rem;
+.kitchen-grid-total .kitchen-grid-cell--ticket {
+  font-size: 1.4rem;
   font-weight: 900;
-  color: #111827;
+  color: var(--clr-primary);
+  letter-spacing: 0.05em;
+}
+
+.kitchen-grid-total .kitchen-grid-cell--qty {
+  font-size: 2.3rem;
+  font-weight: 900;
+  color: #ffffff;
 }
 
 /* ---- Pickup Tab ---- */

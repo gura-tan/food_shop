@@ -52,8 +52,13 @@ export function KitchenTab({ deviceName: _ }: Props) {
                     className={`kitchen-grid-row ${isBilling ? 'kitchen-grid-row--dim' : ''}`}
                   >
                     <div className="kitchen-grid-cell kitchen-grid-cell--ticket">
-                      #{order.ticket_number}
-                      {isBilling && <span className="kitchen-billing-tag">会計中</span>}
+                      <div className="order-ticket-badge">
+                        <span className="order-ticket-label">整理券</span>
+                        <span className="order-ticket-num">#{order.ticket_number}</span>
+                      </div>
+                      {isBilling && (
+                        <span className="order-status-badge order-status-badge--billing">会計中</span>
+                      )}
                     </div>
                     {menuNames.map(name => {
                       const item = order.items?.find(i => i.menu_name === name);

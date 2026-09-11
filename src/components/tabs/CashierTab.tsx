@@ -18,12 +18,96 @@ export function CashierTab({ deviceName }: Props) {
   const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // 端末ごとの整理券番号拘束（ホールド）管理
+  const [heldTicket, setHeldTicket] = useState<number | null>(null);
+  const [hasPrecedingHold, setHasPrecedingHold] = useState(false);
+  const [precedingTicket, setPrecedingTicket] = useState<number | null>(null);
+
   // 整理券番号の手動変更用（デンジャーゾーン・2段階セーフティ＆連続タップ対応）
   type AdjustMode = 'idle' | 'confirming' | 'continuous';
   const [adjustMode, setAdjustMode] = useState<AdjustMode>('idle');
   const [pendingTarget, setPendingTarget] = useState<number | null>(null);
   const [adjustBusy, setAdjustBusy] = useState(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const currentTicket = heldTicket ?? settings.next_ticket_number;
+
+  // 生存確認＆他端末の拘束状況チェック（ハートビート）
+  const refreshHeartbeat = useRef<() => Promise<void>>(async () => {});
+  refreshHeartbeat.current = async () => {
+    try {
+      const { data, error } = await supabase.rpc('heartbeat_cashier_ticket', {
+        p_device_name: deviceName,
+      });
+      if (!error && data && data.length > 0) {
+        const row = data[0] as {
+          ticket_number: number;
+          has_preceding: boolean;
+          preceding_ticket: number | null;
+        };
+        setHeldTicket(row.ticket_number);
+        setHasPrecedingHold(row.has_preceding);
+        setPrecedingTicket(row.preceding_ticket);
+      }
+    } catch (err) {
+      console.warn('[CashierTab] heartbeat error:', err);
+    }
+  };
+
+  // レジタブのマウント時拘束・アンマウント時解放・Realtime購読
+  useEffect(() => {
+    let mounted = true;
+
+    async function initHold() {
+      try {
+        const { data, error } = await supabase.rpc('claim_cashier_ticket', {
+          p_device_name: deviceName,
+        });
+        if (!error && data !== null && mounted) {
+          setHeldTicket(data as number);
+        }
+        if (mounted) {
+          await refreshHeartbeat.current();
+        }
+      } catch (err) {
+        console.warn('[CashierTab] init hold error:', err);
+      }
+    }
+
+    initHold();
+
+    // 5秒ごとの定期ハートビート
+    const heartbeatTimer = setInterval(() => {
+      refreshHeartbeat.current();
+    }, 5000);
+
+    // cashier_holds テーブルのリアルタイム変更を検知（他端末の離脱による自動繰り上がり等）
+    const channel = supabase
+      .channel(`cashier_holds_${deviceName}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cashier_holds' },
+        () => {
+          refreshHeartbeat.current();
+        }
+      )
+      .subscribe();
+
+    // ページ離脱（リロード、閉じる）時の解放
+    const handleBeforeUnload = () => {
+      supabase.rpc('release_cashier_ticket', { p_device_name: deviceName });
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      mounted = false;
+      clearInterval(heartbeatTimer);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      supabase.removeChannel(channel);
+      // レジタブを離脱（アンマウント）する際に拘束を手放す
+      supabase.rpc('release_cashier_ticket', { p_device_name: deviceName });
+    };
+  }, [deviceName]);
 
   function clearAdjustTimer() {
     if (resetTimerRef.current) {
@@ -54,8 +138,10 @@ export function CashierTab({ deviceName }: Props) {
 
   async function applyTicketChange(targetNum: number) {
     setAdjustBusy(true);
-    const oldNum = settings.next_ticket_number;
+    const oldNum = currentTicket;
     await supabase.from('settings').update({ value: String(targetNum) }).eq('key', 'next_ticket_number');
+    // 全端末の拘束番号を再計算・スライド
+    await supabase.rpc('resequence_cashier_holds');
     await writeLog(deviceName, 'settings_updated', {
       key: 'next_ticket_number',
       from: oldNum,
@@ -63,6 +149,7 @@ export function CashierTab({ deviceName }: Props) {
       reason: 'cashier_manual_adjustment',
     });
     await refetchSettings();
+    await refreshHeartbeat.current();
     setAdjustBusy(false);
   }
 
@@ -71,7 +158,7 @@ export function CashierTab({ deviceName }: Props) {
 
     if (adjustMode === 'continuous') {
       // 連続タップモード: 2段階確認を省略して即座に変更
-      const newNum = calcNextTicket(settings.next_ticket_number, settings.ticket_max, delta);
+      const newNum = calcNextTicket(currentTicket, settings.ticket_max, delta);
       await applyTicketChange(newNum);
       startAdjustTimer(3500);
       return;
@@ -79,14 +166,14 @@ export function CashierTab({ deviceName }: Props) {
 
     if (adjustMode === 'confirming') {
       // 確認待ち時にもう一方のボタンを押した場合は変更予定先を更新
-      const newTarget = calcNextTicket(settings.next_ticket_number, settings.ticket_max, delta);
+      const newTarget = calcNextTicket(currentTicket, settings.ticket_max, delta);
       setPendingTarget(newTarget);
       startAdjustTimer(4000);
       return;
     }
 
     // 通常時（idle）: 初回タップは確認待ちモードへ
-    const target = calcNextTicket(settings.next_ticket_number, settings.ticket_max, delta);
+    const target = calcNextTicket(currentTicket, settings.ticket_max, delta);
     setPendingTarget(target);
     setAdjustMode('confirming');
     startAdjustTimer(4000);
@@ -132,29 +219,7 @@ export function CashierTab({ deviceName }: Props) {
     if (cart.length === 0) return;
     handleCancelAdjust();
     setBusy(true);
-    const ticketNumber = settings.next_ticket_number;
-
-    // 同一整理券番号の未完了注文が存在する場合は重複解消のため削除
-    const { data: duplicateOrders } = await supabase
-      .from('orders')
-      .select('id, status')
-      .eq('ticket_number', ticketNumber)
-      .in('status', ['ordering', 'billing', 'cooking', 'delivering']);
-
-    if (duplicateOrders && duplicateOrders.length > 0) {
-      const toDelete = duplicateOrders
-        .map(o => o.id)
-        .filter(id => id !== currentOrderId);
-
-      if (toDelete.length > 0) {
-        await supabase.from('orders').delete().in('id', toDelete);
-        await writeLog(deviceName, 'order_replaced', {
-          ticket_number: ticketNumber,
-          deleted_order_ids: toDelete,
-          previous_statuses: duplicateOrders.filter(o => toDelete.includes(o.id)).map(o => o.status),
-        });
-      }
-    }
+    const ticketNumber = currentTicket;
 
     // Create or update order
     if (currentOrderId === null) {
@@ -208,6 +273,8 @@ export function CashierTab({ deviceName }: Props) {
       });
     }
 
+    // 会計ポップアップ表示時に最新の他端末状況をチェック
+    await refreshHeartbeat.current();
     setShowBilling(true);
     setBusy(false);
   }
@@ -221,12 +288,12 @@ export function CashierTab({ deviceName }: Props) {
     setShowBilling(false);
   }
 
-  // 完了ボタン: move to cooking, increment ticket/order numbers
+  // 完了ボタン: move to cooking, complete ticket hold, and claim next
   async function handleConfirm() {
     if (!currentOrderId) return;
     setBusy(true);
 
-    const ticketNumber = settings.next_ticket_number;
+    const ticketNumber = currentTicket;
 
     // Move order to cooking
     await supabase.from('orders').update({ status: 'cooking' }).eq('id', currentOrderId);
@@ -234,9 +301,15 @@ export function CashierTab({ deviceName }: Props) {
     // Mark ticket as in_use
     await supabase.from('tickets').update({ status: 'in_use', order_id: currentOrderId }).eq('number', ticketNumber);
 
-    // Advance next_ticket_number (wrap around)
-    const newTicket = ticketNumber >= settings.ticket_max ? 1 : ticketNumber + 1;
-    await supabase.from('settings').update({ value: String(newTicket) }).eq('key', 'next_ticket_number');
+    // Complete ticket and claim new ticket for this device
+    const { data: newTicket } = await supabase.rpc('complete_cashier_ticket', {
+      p_device_name: deviceName,
+      p_completed_ticket: ticketNumber,
+    });
+
+    if (newTicket !== null && typeof newTicket === 'number') {
+      setHeldTicket(newTicket);
+    }
 
     await writeLog(deviceName, 'order_billing_confirmed', {
       order_id: currentOrderId,
@@ -249,6 +322,7 @@ export function CashierTab({ deviceName }: Props) {
     setShowBilling(false);
     handleCancelAdjust();
     await refetchSettings();
+    await refreshHeartbeat.current();
     setBusy(false);
   }
 
@@ -258,7 +332,7 @@ export function CashierTab({ deviceName }: Props) {
       <div className="cashier-header">
         <div className="cashier-info-badge cashier-info-badge--ticket">
           <span className="cashier-info-label">整理券番号</span>
-          <span className="cashier-info-value">#{settings.next_ticket_number}</span>
+          <span className="cashier-info-value">#{currentTicket}</span>
         </div>
 
         {/* 整理券番号手動調整ゾーン（デンジャーゾーン） */}
@@ -403,8 +477,20 @@ export function CashierTab({ deviceName }: Props) {
             <h2 className="billing-title">会計確認</h2>
             <div className="billing-ticket">
               <span className="billing-ticket-label">整理券</span>
-              <span className="billing-ticket-number">#{settings.next_ticket_number}</span>
+              <span className="billing-ticket-number">#{currentTicket}</span>
             </div>
+
+            {hasPrecedingHold && (
+              <div className="billing-warning-alert" role="alert">
+                <div className="billing-warning-header">
+                  <span className="billing-warning-icon">⚠️</span>
+                  <span className="billing-warning-title">渡す整理券の番号を確認してください!</span>
+                </div>
+                <p className="billing-warning-sub">
+                  別のレジで若い番号{precedingTicket ? `（#${precedingTicket}）` : ''}が接客中のため、連番が前後しています。
+                </p>
+              </div>
+            )}
 
             <ul className="billing-list">
               {cart.map(item => (

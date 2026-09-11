@@ -43,6 +43,13 @@ export interface Settings {
   next_ticket_number: number;
 }
 
+export interface CashierHold {
+  device_name: string;
+  ticket_number: number;
+  joined_at: string;
+  updated_at: string;
+}
+
 export interface Log {
   id: string;
   device_name: string;

@@ -1042,6 +1042,42 @@ input { font-family: var(--font-body); }
 .billing-ticket-label { font-size: 0.85rem; font-weight: 600; color: var(--clr-warning); }
 .billing-ticket-number { font-size: 2.5rem; font-weight: 900; color: var(--clr-warning); }
 
+/* Billing Warning Alert (逆転会計時の注意喚起) */
+.billing-warning-alert {
+  background: rgba(240, 160, 48, 0.12);
+  border: 1.5px solid var(--clr-warning);
+  border-radius: var(--r-md);
+  padding: var(--sp-sm) var(--sp-md);
+  margin-bottom: var(--sp-lg);
+  text-align: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.billing-warning-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-xs);
+}
+
+.billing-warning-icon {
+  font-size: 1.1rem;
+}
+
+.billing-warning-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--clr-warning);
+  letter-spacing: 0.02em;
+}
+
+.billing-warning-sub {
+  font-size: 0.75rem;
+  color: var(--clr-text-2);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
 .billing-list {
   display: flex;
   flex-direction: column;

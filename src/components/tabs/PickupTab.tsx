@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function PickupTab({ deviceName }: Props) {
-  const { orders } = useOrders();
+  const { orders, refetch } = useOrders();
   const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
   const [busy, setBusy] = useState<number | null>(null);
 
@@ -48,7 +48,7 @@ export function PickupTab({ deviceName }: Props) {
       .update({ status: 'unused', order_id: null })
       .eq('number', ticketNumber);
     await writeLog(deviceName, 'order_completed', { order_id: orderId, ticket_number: ticketNumber });
-    await fetchHistory();
+    await Promise.all([fetchHistory(), refetch()]);
     setBusy(null);
   }
 
@@ -61,7 +61,7 @@ export function PickupTab({ deviceName }: Props) {
       .update({ status: 'in_use', order_id: orderId })
       .eq('number', ticketNumber);
     await writeLog(deviceName, 'order_pickup_reverted', { order_id: orderId, ticket_number: ticketNumber });
-    await fetchHistory();
+    await Promise.all([fetchHistory(), refetch()]);
     setBusy(null);
   }
 

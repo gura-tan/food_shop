@@ -10,6 +10,8 @@ export type LogAction =
   | 'order_pickup_reverted'
   | 'menu_added'
   | 'menu_deleted'
+  | 'order_replaced'
+  | 'refresher_cleaned'
   | 'settings_updated'
   | 'settings_reset_orders'
   | 'settings_reset_tickets';

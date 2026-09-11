@@ -155,6 +155,8 @@ export function SettingsTab({ deviceName }: Props) {
     order_cooking_reverted:  '商品完成取消',
     order_completed:         '受取完了',
     order_pickup_reverted:   '受取完了取消',
+    order_replaced:          '重複注文の自動整理（削除）',
+    refresher_cleaned:       'リフレッシャーによる自動整理',
     menu_added:              'メニュー追加',
     menu_deleted:            'メニュー削除',
     settings_updated:        '設定変更',

@@ -44,6 +44,28 @@ export function CashierTab({ deviceName }: Props) {
     setBusy(true);
     const ticketNumber = settings.next_ticket_number;
 
+    // 同一整理券番号の未完了注文が存在する場合は重複解消のため削除
+    const { data: duplicateOrders } = await supabase
+      .from('orders')
+      .select('id, status')
+      .eq('ticket_number', ticketNumber)
+      .in('status', ['ordering', 'billing', 'cooking', 'delivering']);
+
+    if (duplicateOrders && duplicateOrders.length > 0) {
+      const toDelete = duplicateOrders
+        .map(o => o.id)
+        .filter(id => id !== currentOrderId);
+
+      if (toDelete.length > 0) {
+        await supabase.from('orders').delete().in('id', toDelete);
+        await writeLog(deviceName, 'order_replaced', {
+          ticket_number: ticketNumber,
+          deleted_order_ids: toDelete,
+          previous_statuses: duplicateOrders.filter(o => toDelete.includes(o.id)).map(o => o.status),
+        });
+      }
+    }
+
     // Create or update order
     if (currentOrderId === null) {
       // Create new order in 'ordering' status

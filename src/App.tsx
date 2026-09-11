@@ -7,11 +7,15 @@ import { CashierTab } from './components/tabs/CashierTab';
 import { KitchenTab } from './components/tabs/KitchenTab';
 import { PickupTab } from './components/tabs/PickupTab';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { useDataRefresher } from './hooks/useDataRefresher';
 
 export default function App() {
   const [deviceName, setDeviceName] = useState<string | null>(getStoredDeviceName());
   const [activeTab, setActiveTab] = useState<TabId>('cashier');
   const isOnline = useOnlineStatus();
+
+  // 放置された注文の自動削除・チケット整合性を維持するバックグラウンドリフレッシャー
+  useDataRefresher(deviceName);
 
   // If deviceName is stored, skip setup screen
   function handleDeviceSetup(name: string) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { writeLog } from '../../lib/logger';
 import { useMenus } from '../../hooks/useMenus';
@@ -17,6 +17,95 @@ export function CashierTab({ deviceName }: Props) {
   const [showBilling, setShowBilling] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // 整理券番号の手動変更用（デンジャーゾーン・2段階セーフティ＆連続タップ対応）
+  type AdjustMode = 'idle' | 'confirming' | 'continuous';
+  const [adjustMode, setAdjustMode] = useState<AdjustMode>('idle');
+  const [pendingTarget, setPendingTarget] = useState<number | null>(null);
+  const [adjustBusy, setAdjustBusy] = useState(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearAdjustTimer() {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  }
+
+  function startAdjustTimer(ms = 3500) {
+    clearAdjustTimer();
+    resetTimerRef.current = setTimeout(() => {
+      setAdjustMode('idle');
+      setPendingTarget(null);
+    }, ms);
+  }
+
+  useEffect(() => {
+    return () => clearAdjustTimer();
+  }, []);
+
+  function calcNextTicket(current: number, max: number, delta: number): number {
+    if (delta > 0) {
+      return current >= max ? 1 : current + 1;
+    } else {
+      return current <= 1 ? max : current - 1;
+    }
+  }
+
+  async function applyTicketChange(targetNum: number) {
+    setAdjustBusy(true);
+    const oldNum = settings.next_ticket_number;
+    await supabase.from('settings').update({ value: String(targetNum) }).eq('key', 'next_ticket_number');
+    await writeLog(deviceName, 'settings_updated', {
+      key: 'next_ticket_number',
+      from: oldNum,
+      to: targetNum,
+      reason: 'cashier_manual_adjustment',
+    });
+    await refetchSettings();
+    setAdjustBusy(false);
+  }
+
+  async function handleStepClick(delta: number) {
+    if (showBilling || adjustBusy || busy) return;
+
+    if (adjustMode === 'continuous') {
+      // 連続タップモード: 2段階確認を省略して即座に変更
+      const newNum = calcNextTicket(settings.next_ticket_number, settings.ticket_max, delta);
+      await applyTicketChange(newNum);
+      startAdjustTimer(3500);
+      return;
+    }
+
+    if (adjustMode === 'confirming') {
+      // 確認待ち時にもう一方のボタンを押した場合は変更予定先を更新
+      const newTarget = calcNextTicket(settings.next_ticket_number, settings.ticket_max, delta);
+      setPendingTarget(newTarget);
+      startAdjustTimer(4000);
+      return;
+    }
+
+    // 通常時（idle）: 初回タップは確認待ちモードへ
+    const target = calcNextTicket(settings.next_ticket_number, settings.ticket_max, delta);
+    setPendingTarget(target);
+    setAdjustMode('confirming');
+    startAdjustTimer(4000);
+  }
+
+  async function handleConfirmAdjust() {
+    if (pendingTarget === null || adjustBusy) return;
+    const target = pendingTarget;
+    await applyTicketChange(target);
+    setPendingTarget(null);
+    setAdjustMode('continuous'); // 確定後は連続タップモードへ
+    startAdjustTimer(3500);
+  }
+
+  function handleCancelAdjust() {
+    clearAdjustTimer();
+    setAdjustMode('idle');
+    setPendingTarget(null);
+  }
 
   const total = cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
 
@@ -41,6 +130,7 @@ export function CashierTab({ deviceName }: Props) {
   // Press 会計ボタン: upsert order in 'ordering' status, show billing popup
   async function handleBilling() {
     if (cart.length === 0) return;
+    handleCancelAdjust();
     setBusy(true);
     const ticketNumber = settings.next_ticket_number;
 
@@ -157,6 +247,7 @@ export function CashierTab({ deviceName }: Props) {
     setCart([]);
     setCurrentOrderId(null);
     setShowBilling(false);
+    handleCancelAdjust();
     await refetchSettings();
     setBusy(false);
   }
@@ -168,6 +259,68 @@ export function CashierTab({ deviceName }: Props) {
         <div className="cashier-info-badge cashier-info-badge--ticket">
           <span className="cashier-info-label">整理券番号</span>
           <span className="cashier-info-value">#{settings.next_ticket_number}</span>
+        </div>
+
+        {/* 整理券番号手動調整ゾーン（デンジャーゾーン） */}
+        <div className="ticket-adjust-zone" aria-label="整理券番号手動調整">
+          {adjustMode === 'confirming' && pendingTarget !== null ? (
+            <div className="ticket-adjust-confirm">
+              <span className="ticket-adjust-confirm-label">#{pendingTarget} に変更?</span>
+              <button
+                type="button"
+                id="ticket-adjust-confirm-btn"
+                className="ticket-adjust-btn ticket-adjust-btn--confirm"
+                onClick={handleConfirmAdjust}
+                disabled={adjustBusy || showBilling}
+              >
+                確定
+              </button>
+              <button
+                type="button"
+                id="ticket-adjust-cancel-btn"
+                className="ticket-adjust-btn ticket-adjust-btn--cancel"
+                onClick={handleCancelAdjust}
+                disabled={adjustBusy}
+                title="キャンセル"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div className={`ticket-adjust-stepper ${adjustMode === 'continuous' ? 'ticket-adjust-stepper--active' : ''}`}>
+              <button
+                type="button"
+                id="ticket-adjust-minus"
+                className="ticket-adjust-btn ticket-adjust-btn--step"
+                onClick={() => handleStepClick(-1)}
+                disabled={showBilling || adjustBusy || busy}
+                title="整理券番号を1つ戻す"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                id="ticket-adjust-plus"
+                className="ticket-adjust-btn ticket-adjust-btn--step"
+                onClick={() => handleStepClick(1)}
+                disabled={showBilling || adjustBusy || busy}
+                title="整理券番号を1つ進める"
+              >
+                ＋
+              </button>
+              {adjustMode === 'continuous' && (
+                <button
+                  type="button"
+                  id="ticket-adjust-done-btn"
+                  className="ticket-adjust-btn ticket-adjust-btn--done"
+                  onClick={handleCancelAdjust}
+                  title="調整完了"
+                >
+                  完了
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

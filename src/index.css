@@ -653,7 +653,9 @@ input { font-family: var(--font-body); }
 
 .cashier-header {
   display: flex;
-  gap: var(--sp-sm);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
   padding: var(--sp-md) var(--sp-lg);
   background: var(--clr-surface);
   border-bottom: 1px solid var(--clr-border);
@@ -692,6 +694,136 @@ input { font-family: var(--font-body); }
 }
 
 .cashier-info-badge--ticket .cashier-info-value { color: var(--clr-warning); }
+
+/* ---- Ticket Adjust Zone (Danger Zone / Input Mistake Prevention) ---- */
+.ticket-adjust-zone {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ticket-adjust-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--r-md);
+  padding: 3px 4px;
+  transition: all 0.2s ease;
+}
+
+.ticket-adjust-stepper--active {
+  border-color: var(--clr-warning);
+  background: rgba(240, 160, 48, 0.08);
+  box-shadow: 0 0 10px rgba(240, 160, 48, 0.2);
+}
+
+.ticket-adjust-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--clr-text-muted);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  user-select: none;
+}
+
+.ticket-adjust-btn--step {
+  width: 32px;
+  height: 32px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ticket-adjust-btn--step:hover:not(:disabled) {
+  background: var(--clr-surface-3);
+  color: var(--clr-text);
+  border-color: var(--clr-border-2);
+}
+
+.ticket-adjust-btn--step:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.ticket-adjust-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ticket-adjust-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(240, 160, 48, 0.12);
+  border: 1px solid var(--clr-warning);
+  border-radius: var(--r-md);
+  padding: 3px 8px;
+  animation: fadeIn 0.15s ease;
+}
+
+.ticket-adjust-confirm-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--clr-warning);
+  white-space: nowrap;
+}
+
+.ticket-adjust-btn--confirm {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--clr-warning);
+  color: #111;
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 8px rgba(240, 160, 48, 0.3);
+}
+
+.ticket-adjust-btn--confirm:hover:not(:disabled) {
+  background: var(--clr-warning-dark);
+}
+
+.ticket-adjust-btn--confirm:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.ticket-adjust-btn--cancel {
+  width: 26px;
+  height: 26px;
+  font-size: 0.85rem;
+  color: var(--clr-text-muted);
+}
+
+.ticket-adjust-btn--cancel:hover:not(:disabled) {
+  color: var(--clr-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ticket-adjust-btn--done {
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--clr-warning);
+  border: 1px solid rgba(240, 160, 48, 0.4);
+  border-radius: var(--r-sm);
+  background: rgba(240, 160, 48, 0.1);
+  margin-left: 2px;
+}
+
+.ticket-adjust-btn--done:hover:not(:disabled) {
+  background: rgba(240, 160, 48, 0.25);
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
 
 .cashier-body {
   display: grid;

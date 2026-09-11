@@ -26,13 +26,13 @@ export function DeviceSetup({ onComplete }: Props) {
       <div className="device-setup-card">
         <div className="device-setup-icon">🏪</div>
         <h1 className="device-setup-title">食品出店 注文管理</h1>
-        <p className="device-setup-subtitle">どなたの端末からアクセスしていますか？</p>
+        <p className="device-setup-subtitle">どこの担当に置く端末ですか？</p>
         <form onSubmit={handleSubmit} className="device-setup-form">
           <input
             id="device-name-input"
             type="text"
             className="device-setup-input"
-            placeholder="例: レジ担当・山田"
+            placeholder="例: レジ"
             value={name}
             onChange={e => { setName(e.target.value); setError(''); }}
             autoFocus

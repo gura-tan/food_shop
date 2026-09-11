@@ -7,6 +7,7 @@ export type LogAction =
   | 'order_cooking_done'
   | 'order_cooking_reverted'
   | 'order_completed'
+  | 'order_pickup_reverted'
   | 'menu_added'
   | 'menu_deleted'
   | 'settings_updated'

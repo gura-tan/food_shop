@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { writeLog } from '../../lib/logger';
 import { useMenus } from '../../hooks/useMenus';
 import { useSettings } from '../../hooks/useSettings';
-import { getNextOrderNumber } from '../../hooks/useOrders';
 import type { CartItem } from '../../types';
 
 interface Props {
@@ -15,20 +14,9 @@ export function CashierTab({ deviceName }: Props) {
   const { settings, refetch: refetchSettings } = useSettings();
 
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [nextOrderId, setNextOrderId] = useState<number>(1);
   const [showBilling, setShowBilling] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-
-  // Refresh next order number from DB
-  async function refreshNextOrderId() {
-    const n = await getNextOrderNumber();
-    setNextOrderId(n);
-  }
-
-  useEffect(() => {
-    refreshNextOrderId();
-  }, []);
 
   const total = cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
 
@@ -148,21 +136,16 @@ export function CashierTab({ deviceName }: Props) {
     setCurrentOrderId(null);
     setShowBilling(false);
     await refetchSettings();
-    await refreshNextOrderId();
     setBusy(false);
   }
 
   return (
     <div className="tab-content cashier-tab">
-      {/* Header info */}
+      {/* Header info - Unified to Ticket/整理券 */}
       <div className="cashier-header">
-        <div className="cashier-info-badge">
-          <span className="cashier-info-label">注文番号</span>
-          <span className="cashier-info-value">#{nextOrderId}</span>
-        </div>
         <div className="cashier-info-badge cashier-info-badge--ticket">
-          <span className="cashier-info-label">番号札</span>
-          <span className="cashier-info-value">{settings.next_ticket_number}番</span>
+          <span className="cashier-info-label">整理券番号</span>
+          <span className="cashier-info-value">#{settings.next_ticket_number}</span>
         </div>
       </div>
 
@@ -173,7 +156,7 @@ export function CashierTab({ deviceName }: Props) {
           {menus.length === 0 ? (
             <p className="empty-message">メニューが登録されていません<br />設定タブから追加してください</p>
           ) : (
-            <div className="menu-grid">
+            <div className="menu-grid menu-grid--fixed">
               {menus.map(menu => (
                 <button
                   key={menu.id}
@@ -192,47 +175,49 @@ export function CashierTab({ deviceName }: Props) {
         {/* Order list */}
         <div className="cashier-order-section">
           <h2 className="cashier-section-title">注文内容</h2>
-          {cart.length === 0 ? (
-            <p className="empty-message">メニューを選択してください</p>
-          ) : (
-            <ul className="cart-list">
-              {cart.map(item => (
-                <li key={item.menu_id} className="cart-item">
-                  <div className="cart-item-info">
-                    <span className="cart-item-name">{item.menu_name}</span>
-                    <span className="cart-item-price">¥{item.unit_price.toLocaleString()}</span>
-                  </div>
-                  <div className="cart-item-qty">
-                    <button
-                      id={`qty-minus-${item.menu_id}`}
-                      className="qty-btn qty-btn--minus"
-                      onClick={() => adjustQty(item.menu_id, -1)}
-                    >−</button>
-                    <span className="qty-value">{item.quantity}</span>
-                    <button
-                      id={`qty-plus-${item.menu_id}`}
-                      className="qty-btn qty-btn--plus"
-                      onClick={() => adjustQty(item.menu_id, 1)}
-                    >＋</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="cashier-order-card">
+            {cart.length === 0 ? (
+              <p className="empty-message empty-message--compact">メニューを選択してください</p>
+            ) : (
+              <ul className="cart-list">
+                {cart.map(item => (
+                  <li key={item.menu_id} className="cart-item">
+                    <div className="cart-item-info">
+                      <span className="cart-item-name">{item.menu_name}</span>
+                      <span className="cart-item-price">¥{item.unit_price.toLocaleString()}</span>
+                    </div>
+                    <div className="cart-item-qty">
+                      <button
+                        id={`qty-minus-${item.menu_id}`}
+                        className="qty-btn qty-btn--minus"
+                        onClick={() => adjustQty(item.menu_id, -1)}
+                      >−</button>
+                      <span className="qty-value">{item.quantity}</span>
+                      <button
+                        id={`qty-plus-${item.menu_id}`}
+                        className="qty-btn qty-btn--plus"
+                        onClick={() => adjustQty(item.menu_id, 1)}
+                      >＋</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-          <div className="cashier-total">
-            <span className="cashier-total-label">合計</span>
-            <span className="cashier-total-value">¥{total.toLocaleString()}</span>
+            <div className="cashier-total">
+              <span className="cashier-total-label">合計</span>
+              <span className="cashier-total-value">¥{total.toLocaleString()}</span>
+            </div>
+
+            <button
+              id="billing-button"
+              className="btn btn--billing"
+              onClick={handleBilling}
+              disabled={cart.length === 0 || busy}
+            >
+              💳 会計
+            </button>
           </div>
-
-          <button
-            id="billing-button"
-            className="btn btn--billing"
-            onClick={handleBilling}
-            disabled={cart.length === 0 || busy}
-          >
-            💳 会計
-          </button>
         </div>
       </div>
 
@@ -242,8 +227,8 @@ export function CashierTab({ deviceName }: Props) {
           <div className="billing-card">
             <h2 className="billing-title">会計確認</h2>
             <div className="billing-ticket">
-              <span className="billing-ticket-label">番号札</span>
-              <span className="billing-ticket-number">{settings.next_ticket_number}番</span>
+              <span className="billing-ticket-label">整理券</span>
+              <span className="billing-ticket-number">#{settings.next_ticket_number}</span>
             </div>
 
             <ul className="billing-list">

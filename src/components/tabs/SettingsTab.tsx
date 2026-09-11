@@ -21,6 +21,11 @@ export function SettingsTab({ deviceName }: Props) {
   const [confirmDialog, setConfirmDialog] = useState<null | 'orders' | 'tickets'>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  // Password lock state
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
   // Logs
   const [logDate, setLogDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [logs, setLogs] = useState<Log[]>([]);
@@ -35,6 +40,17 @@ export function SettingsTab({ deviceName }: Props) {
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
+  }
+
+  function handleUnlock(e: React.FormEvent) {
+    e.preventDefault();
+    if (password === 'ate') {
+      setIsUnlocked(true);
+      setPasswordError('');
+      setPassword('');
+    } else {
+      setPasswordError('パスワードが正しくありません');
+    }
   }
 
   // ---- Ticket max update ----
@@ -57,7 +73,7 @@ export function SettingsTab({ deviceName }: Props) {
     await writeLog(deviceName, 'settings_updated', { key: 'ticket_max', value: val });
     await refetchSettings();
     setBusyAction(null);
-    showToast('番号札枚数を更新しました');
+    showToast('整理券枚数を更新しました');
   }
 
   // ---- Menu ----
@@ -102,7 +118,7 @@ export function SettingsTab({ deviceName }: Props) {
     await writeLog(deviceName, 'settings_reset_orders');
     await refetchSettings();
     setBusyAction(null);
-    showToast('注文番号・番号札をリセットしました');
+    showToast('整理券・注文履歴をリセットしました');
   }
 
   async function handleResetTickets() {
@@ -113,7 +129,7 @@ export function SettingsTab({ deviceName }: Props) {
     await writeLog(deviceName, 'settings_reset_tickets');
     await refetchSettings();
     setBusyAction(null);
-    showToast('番号札をリセットしました');
+    showToast('整理券番号をリセットしました');
   }
 
   // ---- Logs ----
@@ -138,28 +154,68 @@ export function SettingsTab({ deviceName }: Props) {
     order_cooking_done:      '商品完成',
     order_cooking_reverted:  '商品完成取消',
     order_completed:         '受取完了',
+    order_pickup_reverted:   '受取完了取消',
     menu_added:              'メニュー追加',
     menu_deleted:            'メニュー削除',
     settings_updated:        '設定変更',
-    settings_reset_orders:   '注文リセット',
-    settings_reset_tickets:  '番号札リセット',
+    settings_reset_orders:   '整理券・注文リセット',
+    settings_reset_tickets:  '整理券リセット',
   };
+
+  if (!isUnlocked) {
+    return (
+      <div className="tab-content settings-lock-container">
+        <div className="settings-lock-card">
+          <div className="settings-lock-icon">🔒</div>
+          <h2 className="settings-lock-title">設定のロック解除</h2>
+          <p className="settings-lock-desc">設定画面を開くにはパスワードを入力してください</p>
+          <form onSubmit={handleUnlock} className="settings-lock-form">
+            <input
+              id="settings-password-input"
+              type="password"
+              className="settings-input settings-lock-input"
+              placeholder="パスワード"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setPasswordError(''); }}
+              autoFocus
+            />
+            {passwordError && <p className="settings-lock-error">{passwordError}</p>}
+            <button id="settings-unlock-button" type="submit" className="btn btn--primary btn--full">
+              解除
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tab-content settings-tab">
       {toast && <div className="toast">{toast}</div>}
+
+      {/* Header bar with lock button */}
+      <div className="settings-header-bar">
+        <h1 className="settings-page-title">⚙️ システム設定</h1>
+        <button
+          id="settings-lock-button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => setIsUnlocked(false)}
+        >
+          🔒 ロックする
+        </button>
+      </div>
 
       {/* Confirm dialog */}
       {confirmDialog && (
         <div className="confirm-overlay">
           <div className="confirm-card">
             <h3 className="confirm-title">
-              {confirmDialog === 'orders' ? '注文番号・番号札をリセット' : '番号札をリセット'}
+              {confirmDialog === 'orders' ? '整理券・注文履歴をリセット' : '整理券番号をリセット'}
             </h3>
             <p className="confirm-message">
               {confirmDialog === 'orders'
-                ? 'すべての注文データを削除し、注文番号と番号札を1に戻します。この操作は取り消せません。'
-                : '番号札をすべて未使用に戻し、次の番号を1に設定します。'}
+                ? 'すべての注文データを削除し、整理券番号を1に戻します。この操作は取り消せません。'
+                : '整理券番号を1にリセットします。'}
             </p>
             <div className="confirm-actions">
               <button className="btn btn--ghost" onClick={() => setConfirmDialog(null)}>キャンセル</button>
@@ -176,7 +232,7 @@ export function SettingsTab({ deviceName }: Props) {
 
       {/* Ticket max */}
       <section className="settings-section">
-        <h2 className="settings-section-title">🎫 番号札の設定</h2>
+        <h2 className="settings-section-title">🎫 整理券の設定</h2>
         <div className="settings-row">
           <label htmlFor="ticket-max-input" className="settings-label">最大枚数</label>
           <div className="settings-input-group">
@@ -199,7 +255,7 @@ export function SettingsTab({ deviceName }: Props) {
               保存
             </button>
           </div>
-          <p className="settings-hint">現在: {settings.ticket_max}枚 ／ 次の番号札: {settings.next_ticket_number}番</p>
+          <p className="settings-hint">現在: {settings.ticket_max}枚 ／ 次の整理券番号: #{settings.next_ticket_number}</p>
         </div>
       </section>
 
@@ -269,7 +325,7 @@ export function SettingsTab({ deviceName }: Props) {
             onClick={() => setConfirmDialog('orders')}
             disabled={!!busyAction}
           >
-            注文番号・番号札をリセット
+            整理券・注文履歴をリセット
           </button>
           <button
             id="reset-tickets-button"
@@ -277,7 +333,7 @@ export function SettingsTab({ deviceName }: Props) {
             onClick={() => setConfirmDialog('tickets')}
             disabled={!!busyAction}
           >
-            番号札のみリセット
+            整理券番号のみリセット
           </button>
         </div>
       </section>

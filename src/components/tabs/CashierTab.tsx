@@ -3,7 +3,12 @@ import { supabase } from '../../lib/supabase';
 import { writeLog } from '../../lib/logger';
 import { useMenus } from '../../hooks/useMenus';
 import { useSettings } from '../../hooks/useSettings';
+import { useProductSalesCount } from '../../hooks/useProductSalesCount';
+import { HelpTooltip } from '../HelpTooltip';
 import type { CartItem } from '../../types';
+
+const CASHIER_HELP = `会計iPad端末と同じ注文内容をボタンをタップして入力し、数を確認して「完了」ボタンを押してください。
+数量を間違えて完了させてしまった場合は、編集したい整理券番号を+-ボタンであわせ、もう一度同じ手順で完了させてください。自動的に注文が上書きされます。`;
 
 interface Props {
   deviceName: string;
@@ -12,6 +17,7 @@ interface Props {
 export function CashierTab({ deviceName }: Props) {
   const { menus } = useMenus();
   const { settings, refetch: refetchSettings } = useSettings();
+  const { chocoBanana, strawberryBanana, refetch: refetchSalesCount } = useProductSalesCount();
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showBilling, setShowBilling] = useState(false);
@@ -22,6 +28,8 @@ export function CashierTab({ deviceName }: Props) {
   const [heldTicket, setHeldTicket] = useState<number | null>(null);
   const [hasPrecedingHold, setHasPrecedingHold] = useState(false);
   const [precedingTicket, setPrecedingTicket] = useState<number | null>(null);
+  // 他端末が保持中の整理券番号リスト（+/-ボタンのスキップに使用）
+  const [otherHeldTickets, setOtherHeldTickets] = useState<number[]>([]);
 
   // 整理券番号の手動変更用（デンジャーゾーン・2段階セーフティ＆連続タップ対応）
   type AdjustMode = 'idle' | 'confirming' | 'continuous';
@@ -44,10 +52,12 @@ export function CashierTab({ deviceName }: Props) {
           ticket_number: number;
           has_preceding: boolean;
           preceding_ticket: number | null;
+          held_by_others: number[] | null;
         };
         setHeldTicket(row.ticket_number);
         setHasPrecedingHold(row.has_preceding);
         setPrecedingTicket(row.preceding_ticket);
+        setOtherHeldTickets(row.held_by_others ?? []);
       }
     } catch (err) {
       console.warn('[CashierTab] heartbeat error:', err);
@@ -128,12 +138,29 @@ export function CashierTab({ deviceName }: Props) {
     return () => clearAdjustTimer();
   }, []);
 
-  function calcNextTicket(current: number, max: number, delta: number): number {
-    if (delta > 0) {
-      return current >= max ? 1 : current + 1;
-    } else {
-      return current <= 1 ? max : current - 1;
+  /**
+   * delta の方向へ進みながら、他端末が保持中の番号（otherHeld）を飛ばして
+   * 最初の空き番号を返す。全番号が埋まっている場合は current をそのまま返す。
+   */
+  function calcNextAvailableTicket(
+    current: number,
+    max: number,
+    delta: number,
+    otherHeld: number[],
+  ): number {
+    const blocked = new Set(otherHeld);
+    let candidate = delta > 0
+      ? (current >= max ? 1 : current + 1)
+      : (current <= 1 ? max : current - 1);
+
+    // max 回試行して空きがなければ current を維持
+    for (let i = 0; i < max; i++) {
+      if (!blocked.has(candidate)) return candidate;
+      candidate = delta > 0
+        ? (candidate >= max ? 1 : candidate + 1)
+        : (candidate <= 1 ? max : candidate - 1);
     }
+    return current;
   }
 
   async function applyTicketChange(targetNum: number) {
@@ -158,7 +185,7 @@ export function CashierTab({ deviceName }: Props) {
 
     if (adjustMode === 'continuous') {
       // 連続タップモード: 2段階確認を省略して即座に変更
-      const newNum = calcNextTicket(currentTicket, settings.ticket_max, delta);
+      const newNum = calcNextAvailableTicket(currentTicket, settings.ticket_max, delta, otherHeldTickets);
       await applyTicketChange(newNum);
       startAdjustTimer(3500);
       return;
@@ -166,14 +193,14 @@ export function CashierTab({ deviceName }: Props) {
 
     if (adjustMode === 'confirming') {
       // 確認待ち時にもう一方のボタンを押した場合は変更予定先を更新
-      const newTarget = calcNextTicket(currentTicket, settings.ticket_max, delta);
+      const newTarget = calcNextAvailableTicket(currentTicket, settings.ticket_max, delta, otherHeldTickets);
       setPendingTarget(newTarget);
       startAdjustTimer(4000);
       return;
     }
 
     // 通常時（idle）: 初回タップは確認待ちモードへ
-    const target = calcNextTicket(currentTicket, settings.ticket_max, delta);
+    const target = calcNextAvailableTicket(currentTicket, settings.ticket_max, delta, otherHeldTickets);
     setPendingTarget(target);
     setAdjustMode('confirming');
     startAdjustTimer(4000);
@@ -321,8 +348,11 @@ export function CashierTab({ deviceName }: Props) {
     setCurrentOrderId(null);
     setShowBilling(false);
     handleCancelAdjust();
-    await refetchSettings();
-    await refreshHeartbeat.current();
+    await Promise.all([
+      refetchSettings(),
+      refetchSalesCount(),
+      refreshHeartbeat.current(),
+    ]);
     setBusy(false);
   }
 
@@ -330,6 +360,7 @@ export function CashierTab({ deviceName }: Props) {
     <div className="tab-content cashier-tab">
       {/* Header info - Unified to Ticket/整理券 */}
       <div className="cashier-header">
+        <HelpTooltip text={CASHIER_HELP} />
         <div className="cashier-info-badge cashier-info-badge--ticket">
           <span className="cashier-info-label">整理券番号</span>
           <span className="cashier-info-value">#{currentTicket}</span>
@@ -466,6 +497,30 @@ export function CashierTab({ deviceName }: Props) {
             >
               💳 会計
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 注文個数合計フッターバー */}
+      <div className="cashier-footer-summary" aria-label="注文個数合計（調理中以降）">
+        <div className="cashier-summary-label">
+          <span className="cashier-summary-icon">📊</span>
+          <span className="cashier-summary-title">注文個数合計</span>
+        </div>
+        <div className="cashier-summary-items">
+          <div className="cashier-summary-card cashier-summary-card--choco">
+            <span className="cashier-summary-name">チョコバナナ</span>
+            <div className="cashier-summary-value-wrap">
+              <span className="cashier-summary-value">{chocoBanana}</span>
+              <span className="cashier-summary-unit">個</span>
+            </div>
+          </div>
+          <div className="cashier-summary-card cashier-summary-card--strawberry">
+            <span className="cashier-summary-name">いちごバナナ</span>
+            <div className="cashier-summary-value-wrap">
+              <span className="cashier-summary-value">{strawberryBanana}</span>
+              <span className="cashier-summary-unit">個</span>
+            </div>
           </div>
         </div>
       </div>

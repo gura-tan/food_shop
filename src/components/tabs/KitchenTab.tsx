@@ -1,5 +1,8 @@
 import { useOrders } from '../../hooks/useOrders';
 import { useMenus } from '../../hooks/useMenus';
+import { HelpTooltip } from '../HelpTooltip';
+
+const KITCHEN_HELP = `注文が入っている個数が表示されます。このタブは確認のみで操作できません。「受取」タブで受け渡しを完了させると、このタブから表示が消えます。`;
 
 interface Props {
   deviceName: string;
@@ -27,6 +30,7 @@ export function KitchenTab({ deviceName: _ }: Props) {
 
   return (
     <div className="tab-content kitchen-tab-container">
+      <HelpTooltip text={KITCHEN_HELP} />
       <div className="kitchen-display-card">
         {activeOrders.length === 0 ? (
           <p className="empty-message empty-message--large">現在、調理待ちの注文はありません</p>

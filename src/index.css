@@ -1374,3 +1374,187 @@ input { font-family: var(--font-body); }
 .order-item-row--muted {
   opacity: 0.65;
 }
+
+/* ---- Help Tooltip ---- */
+.help-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.help-tooltip-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-full);
+  background: var(--clr-surface-2);
+  border: 1.5px solid var(--clr-border-2);
+  color: var(--clr-text-2);
+  font-size: 0.85rem;
+  font-style: normal;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.help-tooltip-btn:hover,
+.help-tooltip-btn[aria-expanded="true"] {
+  background: var(--clr-primary);
+  border-color: var(--clr-primary);
+  color: #fff;
+}
+
+.help-tooltip-box {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 200;
+  background: var(--clr-surface-3);
+  border: 1px solid var(--clr-border-2);
+  border-radius: var(--r-md);
+  padding: var(--sp-md) var(--sp-lg);
+  box-shadow: var(--shadow-lg);
+  width: min(340px, 88vw);
+  pointer-events: none;
+}
+
+.help-tooltip-para {
+  font-size: 0.85rem;
+  line-height: 1.65;
+  color: var(--clr-text-2);
+}
+
+.help-tooltip-para + .help-tooltip-para {
+  margin-top: var(--sp-sm);
+}
+
+/* ---- Tab Section Header (title + help icon) ---- */
+.tab-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-lg) var(--sp-lg) 0;
+}
+
+.tab-section-header .tab-section-title {
+  padding: 0;
+}
+
+/* ---- Cashier Footer Summary Bar ---- */
+.cashier-footer-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: var(--sp-sm) var(--sp-lg);
+  background: var(--clr-surface);
+  border-top: 1px solid var(--clr-border);
+  flex-shrink: 0;
+}
+
+.cashier-summary-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+}
+
+.cashier-summary-icon {
+  font-size: 1.1rem;
+}
+
+.cashier-summary-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--clr-text-2);
+  letter-spacing: 0.02em;
+}
+
+.cashier-summary-items {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+}
+
+.cashier-summary-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 6px 14px;
+  border-radius: var(--r-md);
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+}
+
+.cashier-summary-card--choco {
+  border-color: rgba(240, 160, 48, 0.35);
+  background: rgba(240, 160, 48, 0.08);
+}
+
+.cashier-summary-card--strawberry {
+  border-color: rgba(240, 80, 130, 0.35);
+  background: rgba(240, 80, 130, 0.08);
+}
+
+.cashier-summary-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--clr-text-2);
+}
+
+.cashier-summary-card--choco .cashier-summary-name {
+  color: #f7ba5a;
+}
+
+.cashier-summary-card--strawberry .cashier-summary-name {
+  color: #ff7597;
+}
+
+.cashier-summary-value-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.cashier-summary-value {
+  font-size: 1.3rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--clr-text);
+  font-feature-settings: "tnum";
+}
+
+.cashier-summary-card--choco .cashier-summary-value {
+  color: #ffc46a;
+}
+
+.cashier-summary-card--strawberry .cashier-summary-value {
+  color: #ff85a2;
+}
+
+.cashier-summary-unit {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--clr-text-muted);
+}
+
+@media (max-width: 640px) {
+  .cashier-footer-summary {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-xs);
+    padding: var(--sp-xs) var(--sp-md);
+  }
+
+  .cashier-summary-items {
+    justify-content: space-between;
+  }
+
+  .cashier-summary-card {
+    flex: 1;
+    justify-content: space-between;
+    padding: 6px 10px;
+  }
+}

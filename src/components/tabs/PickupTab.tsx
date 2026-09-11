@@ -2,7 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { writeLog } from '../../lib/logger';
 import { useOrders } from '../../hooks/useOrders';
+import { HelpTooltip } from '../HelpTooltip';
 import type { Order } from '../../types';
+
+const PICKUP_HELP = `注文の個数と整理券の番号を確認して、番号でお客さんの呼び出しを行い、商品を手渡してください。
+受け渡しが終わったら逐次完了ボタンを押してください。「直近の完成済み」セクションから取り消すことができます。`;
 
 interface Props {
   deviceName: string;
@@ -67,7 +71,10 @@ export function PickupTab({ deviceName }: Props) {
 
   return (
     <div className="tab-content pickup-tab">
-      <h2 className="tab-section-title">受取待ち</h2>
+      <div className="tab-section-header">
+        <h2 className="tab-section-title">受取待ち</h2>
+        <HelpTooltip text={PICKUP_HELP} />
+      </div>
 
       {visibleOrders.length === 0 ? (
         <p className="empty-message">受取待ちの注文はありません</p>
